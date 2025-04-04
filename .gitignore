@@ -42,3 +42,8 @@ linux/
 macos/
 web/
 windows/
+
+#Fltuter 
+.metadata
+pubspec.lock
+analysis_options.yaml

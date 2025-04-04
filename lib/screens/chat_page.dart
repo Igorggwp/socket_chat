@@ -8,8 +8,7 @@ import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:web_socket_client/web_socket_client.dart';
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({Key? key, required this.name, required this.id})
-      : super(key: key);
+  const ChatPage({super.key, required this.name, required this.id});
 
   final String name;
   final String id;
@@ -22,6 +21,7 @@ class _ChatPageState extends State<ChatPage> {
   final socket = WebSocket(Uri.parse('ws://10.200.74.57:8765'));
   final List<types.Message> _messages = [];
   late types.User me;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -36,7 +36,7 @@ class _ChatPageState extends State<ChatPage> {
 
       var sender = types.User(id: id, firstName: nick);
 
-      if (msg.startsWith('http') && (msg.endsWith('.jpg') || msg.endsWith('.png') || msg.endsWith('.gif'))) {
+      if (msg.startsWith('file://') || msg.endsWith('.jpg') || msg.endsWith('.png') || msg.endsWith('.gif')) {
         _addMessage(types.ImageMessage(
           author: sender,
           id: randomString(),
@@ -94,21 +94,21 @@ class _ChatPageState extends State<ChatPage> {
     _sendMessage(message.text);
   }
 
-  void _handleImageSelection() async {
-    final result = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 70,
-      maxWidth: 1440,
-    );
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      final uri = image.path;
+      final payload = {'id': me.id, 'msg': uri, 'nick': me.firstName};
+      socket.send(json.encode(payload));
 
-    if (result != null) {
-      final file = File(result.path);
-      final bytes = await file.readAsBytes();
-
-      String base64Image = base64Encode(bytes);
-      String imageUri = 'data:image/png;base64,$base64Image';
-
-      _sendMessage(imageUri);
+      _addMessage(types.ImageMessage(
+        author: me,
+        id: randomString(),
+        uri: uri,
+        name: image.name,
+        size: await File(uri).length(),
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+      ));
     }
   }
 
@@ -119,7 +119,10 @@ class _ChatPageState extends State<ChatPage> {
         title: Text('Chat: ${widget.name}', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.deepPurple,
         actions: [
-          IconButton(icon: Icon(Icons.image), onPressed: _handleImageSelection),
+          IconButton(
+            icon: Icon(Icons.image, color: Colors.white),
+            onPressed: _pickImage,
+          ),
         ],
       ),
       body: Chat(
